@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"grysha11/BlogAggregator/internal/config"
+	"grysha11/BlogAggregator/internal/database"
 )
 
 type state struct {
+	db 		*database.Queries
 	config	*config.Config
 }
 

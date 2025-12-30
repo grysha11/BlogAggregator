@@ -1,10 +1,14 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 
 	"grysha11/BlogAggregator/internal/config"
+	"grysha11/BlogAggregator/internal/database"
+
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -18,7 +22,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	db, err := sql.Open("postgres", cfg.DBUrl)
+	if err != nil {
+		fmt.Printf("Error while connecting to database: %v\n", err)
+		os.Exit(1)
+	}
+
 	s := state{}
+	s.db = database.New(db)
 	s.config = &cfg
 
 	cmds := commands{}
