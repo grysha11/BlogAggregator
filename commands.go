@@ -1,9 +1,14 @@
 package main
 
 import (
+	"context"
+	"database/sql"
 	"fmt"
 	"grysha11/BlogAggregator/internal/config"
 	"grysha11/BlogAggregator/internal/database"
+	"time"
+
+	"github.com/google/uuid"
 )
 
 type state struct {
@@ -48,6 +53,14 @@ func handlerLogin(s *state, cmd command) error {
 		return fmt.Errorf("incorrect amount of arguments in command call: %v <%v>\nUsage: login <argument>", cmd.name, cmd.args)
 	}
 
+	checkExist, err := s.db.GetUser(context.Background(), cmd.args[0])
+	if checkExist.ID == uuid.Nil {
+		return fmt.Errorf("user don't exist")
+	}
+	if err != nil {
+		return err
+	}
+
 	if err := s.config.SetUser(cmd.args[0]); err != nil {
 		return err
 	}
@@ -56,5 +69,33 @@ func handlerLogin(s *state, cmd command) error {
 	return nil
 }
 
+func handlerRegister(s *state, cmd command) error {
+	if len(cmd.args) != 1 {
+		return fmt.Errorf("incorrect amount of arguments in command call: %v <%v>\nUsage: register <argument>", cmd.name, cmd.args)
+	}
 
+	checkDup, err := s.db.GetUser(context.Background(), cmd.args[0])
+	if err == nil && checkDup.ID != uuid.Nil {
+		return fmt.Errorf("user already exists, exiting now...")
+	}
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
 
+	user, err := s.db.CreateUser(context.Background(), database.CreateUserParams{
+		ID: uuid.New(),
+		CreatedAt: time.Now(),
+		UpdatedAt: time.Now(),
+		Name: cmd.args[0],
+	})
+	if err != nil {
+		return err
+	}
+	if err = s.config.SetUser(cmd.args[0]); err != nil {
+		return err
+	}
+
+	fmt.Printf("User was created: %+v\n", user)
+
+	return nil
+}
