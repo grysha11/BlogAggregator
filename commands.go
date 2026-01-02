@@ -99,3 +99,46 @@ func handlerRegister(s *state, cmd command) error {
 
 	return nil
 }
+
+func handlerReset(s *state, cmd command) error {
+	//i will not add checker for args it will execute anyway
+
+	err := s.db.DeleteUsers(context.Background())
+
+	return err
+}
+
+func handlerUsers(s *state, cmd command) error {
+	//same here with args checker
+
+	users, err := s.db.GetAllUsers(context.Background())
+	if err != nil {
+		return err
+	}
+
+	if len(users) == 0 {
+		fmt.Printf("There are no users yet!")
+		return nil
+	}
+
+	for _, user := range users {
+		fmt.Printf("* %v", user.Name)
+		if user.Name == s.config.CurrentUsername {
+			fmt.Printf(" (current)")
+		}
+		fmt.Printf("\n")
+	}
+
+	return nil
+}
+
+func handlerAgg(s *state, cmd command) error {
+	feed, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Feed is: %+v\n", feed)
+
+	return nil
+}

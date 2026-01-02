@@ -35,6 +35,9 @@ func main() {
 	cmds := commands{}
 	cmds.register("login", handlerLogin)
 	cmds.register("register", handlerRegister)
+	cmds.register("reset", handlerReset)
+	cmds.register("users", handlerUsers)
+	cmds.register("agg", handlerAgg)
 
 	cmd := command{
 		name: os.Args[1],
