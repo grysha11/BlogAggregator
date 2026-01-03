@@ -53,7 +53,7 @@ func handlerLogin(s *state, cmd command) error {
 		return fmt.Errorf("incorrect amount of arguments in command call: %v <%v>\nUsage: login <argument>", cmd.name, cmd.args)
 	}
 
-	checkExist, err := s.db.GetUser(context.Background(), cmd.args[0])
+	checkExist, err := s.db.GetUserByName(context.Background(), cmd.args[0])
 	if checkExist.ID == uuid.Nil {
 		return fmt.Errorf("user don't exist")
 	}
@@ -74,7 +74,7 @@ func handlerRegister(s *state, cmd command) error {
 		return fmt.Errorf("incorrect amount of arguments in command call: %v <%v>\nUsage: register <argument>", cmd.name, cmd.args)
 	}
 
-	checkDup, err := s.db.GetUser(context.Background(), cmd.args[0])
+	checkDup, err := s.db.GetUserByName(context.Background(), cmd.args[0])
 	if err == nil && checkDup.ID != uuid.Nil {
 		return fmt.Errorf("user already exists, exiting now...")
 	}
@@ -104,6 +104,7 @@ func handlerReset(s *state, cmd command) error {
 	//i will not add checker for args it will execute anyway
 
 	err := s.db.DeleteUsers(context.Background())
+	err = s.db.DeleteFeeds(context.Background())
 
 	return err
 }
@@ -139,6 +140,51 @@ func handlerAgg(s *state, cmd command) error {
 	}
 
 	fmt.Printf("Feed is: %+v\n", feed)
+
+	return nil
+}
+
+func handlerAddFeed(s *state, cmd command) error {
+	if len(cmd.args) != 2 {
+		return fmt.Errorf("incorrect amount of arguments in command call: <%v> <%v,%v>\nUsage: addfeed <feed_name> <feed_url>", cmd.name, cmd.args[0], cmd.args[1])
+	}
+
+	user, err := s.db.GetUserByName(context.Background(), s.config.CurrentUsername)
+	if err != nil {
+		return err
+	}
+
+	feed, err := s.db.CreateFeed(context.Background(), database.CreateFeedParams{
+		Name: cmd.args[0],
+		Url: cmd.args[1],
+		UserID: user.ID,
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Feed was created: %+v\n", feed)
+	return nil
+}
+
+func handlerFeeds(s *state, cmd command) error {
+	feeds, err := s.db.GetAllFeeds(context.Background())
+	if err != nil {
+		return err
+	}
+
+	if len(feeds) == 0 {
+		fmt.Printf("There are no feeds yet!\n")
+		return nil
+	}
+
+	for _, feed := range feeds {
+		user, err := s.db.GetUserByID(context.Background(), feed.UserID)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("*\t%v\n\t %v\n\t %v\n", feed.Name, feed.Url, user.Name)
+	}
 
 	return nil
 }
