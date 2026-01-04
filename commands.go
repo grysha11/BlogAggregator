@@ -147,14 +147,9 @@ func handlerAgg(s *state, cmd command) error {
 
 //TODO add checker for dups of feeds
 
-func handlerAddFeed(s *state, cmd command) error {
+func handlerAddFeed(s *state, cmd command, user database.User) error {
 	if len(cmd.args) != 2 {
 		return fmt.Errorf("incorrect amount of arguments in command call: <%v> <%v,%v>\nUsage: addfeed <feed_name> <feed_url>", cmd.name, cmd.args[0], cmd.args[1])
-	}
-
-	user, err := s.db.GetUserByName(context.Background(), s.config.CurrentUsername)
-	if err != nil {
-		return err
 	}
 
 	checkDup, err := s.db.GetFeedByURL(context.Background(), cmd.args[1])
@@ -211,7 +206,7 @@ func handlerFeeds(s *state, cmd command) error {
 	return nil
 }
 
-func handlerFollow(s *state, cmd command) error {
+func handlerFollow(s *state, cmd command, user database.User) error {
 	if len(cmd.args) != 1 {
 		return fmt.Errorf("incorrect amount of arguments in command call: <%v> <%v>\nUsage: follow <feed_url>", cmd.name, cmd.args[0])
 	}
@@ -219,11 +214,6 @@ func handlerFollow(s *state, cmd command) error {
 	feed, err := s.db.GetFeedByURL(context.Background(), cmd.args[0])
 	if err != nil {
 		return fmt.Errorf("Feed doesn't exist: %v", err)
-	}
-
-	user, err := s.db.GetUserByName(context.Background(), s.config.CurrentUsername)
-	if err != nil {
-		return err
 	}
 
 	follow, err := s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{
@@ -241,12 +231,7 @@ func handlerFollow(s *state, cmd command) error {
 	return nil
 }
 
-func handlerFollowing(s *state, cmd command) error {
-	user, err := s.db.GetUserByName(context.Background(), s.config.CurrentUsername)
-	if err != nil {
-		return err
-	}
-
+func handlerFollowing(s *state, cmd command, user database.User) error {
 	feeds, err := s.db.GetFeedFollowsForUser(context.Background(), user.ID)
 	if err != nil {
 		return err
@@ -262,5 +247,22 @@ func handlerFollowing(s *state, cmd command) error {
 		fmt.Printf("\t* %v\n", feed.FeedName)
 	}
 
+	return nil
+}
+
+func handlerUnfollow(s *state, cmd command, user database.User) error {
+	if len(cmd.args) != 1 {
+		return fmt.Errorf("incorrect amount of arguments in command call: <%v> <%v>\nUsage: unfollow <feed_url>", cmd.name, cmd.args[0])
+	}
+
+	err := s.db.DeleteFeedFollowByUrl(context.Background(), database.DeleteFeedFollowByUrlParams{
+		UserID: user.ID,
+		Url: cmd.args[0],
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Feed was unfollowed: %v\n", cmd.args[0])
 	return nil
 }
