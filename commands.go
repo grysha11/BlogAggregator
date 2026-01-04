@@ -50,7 +50,7 @@ func (c *commands) register(name string, f func(*state, command) error) {
 
 func handlerLogin(s *state, cmd command) error {
 	if len(cmd.args) != 1 {
-		return fmt.Errorf("incorrect amount of arguments in command call: %v <%v>\nUsage: login <argument>", cmd.name, cmd.args)
+		return fmt.Errorf("incorrect amount of arguments in command call: %v\nUsage: login <argument>", cmd.name)
 	}
 
 	checkExist, err := s.db.GetUserByName(context.Background(), cmd.args[0])
@@ -65,13 +65,13 @@ func handlerLogin(s *state, cmd command) error {
 		return err
 	}
 
-	fmt.Printf("Username have been set to %v\n", s.config.CurrentUsername)
+	fmt.Printf("Logged as: %v\n", s.config.CurrentUsername)
 	return nil
 }
 
 func handlerRegister(s *state, cmd command) error {
 	if len(cmd.args) != 1 {
-		return fmt.Errorf("incorrect amount of arguments in command call: %v <%v>\nUsage: register <argument>", cmd.name, cmd.args)
+		return fmt.Errorf("incorrect amount of arguments in command call: %v\nUsage: register <argument>", cmd.name)
 	}
 
 	checkDup, err := s.db.GetUserByName(context.Background(), cmd.args[0])
@@ -135,21 +135,29 @@ func handlerUsers(s *state, cmd command) error {
 }
 
 func handlerAgg(s *state, cmd command) error {
-	feed, err := fetchFeed(context.Background(), "https://www.wagslane.dev/index.xml")
-	if err != nil {
-		return err
+	if len(cmd.args) != 1 {
+		return fmt.Errorf("incorrect amount of arguments in command call: <%v>\nUsage: agg <time_between_reqs/1h,1m,1s>", cmd.name)
 	}
 
-	fmt.Printf("Feed is: %+v\n", feed)
+	timeBetweenReqs, err := time.ParseDuration(cmd.args[0])
+	if err != nil {
+		return fmt.Errorf("error during parsing time: %v\nUsage: agg <time_between_reqs/1h,1m,1s>", err)
+	}
 
-	return nil
+	fmt.Printf("Collecting feeds every %v\n", timeBetweenReqs)
+
+	ticker := time.NewTicker(timeBetweenReqs)
+	
+	for ; ; <-ticker.C {
+		scrapeFeeds(s)
+	}
 }
 
 //TODO add checker for dups of feeds
 
 func handlerAddFeed(s *state, cmd command, user database.User) error {
 	if len(cmd.args) != 2 {
-		return fmt.Errorf("incorrect amount of arguments in command call: <%v> <%v,%v>\nUsage: addfeed <feed_name> <feed_url>", cmd.name, cmd.args[0], cmd.args[1])
+		return fmt.Errorf("incorrect amount of arguments in command call: <%v>\nUsage: addfeed <feed_name> <feed_url>", cmd.name)
 	}
 
 	checkDup, err := s.db.GetFeedByURL(context.Background(), cmd.args[1])
@@ -208,7 +216,7 @@ func handlerFeeds(s *state, cmd command) error {
 
 func handlerFollow(s *state, cmd command, user database.User) error {
 	if len(cmd.args) != 1 {
-		return fmt.Errorf("incorrect amount of arguments in command call: <%v> <%v>\nUsage: follow <feed_url>", cmd.name, cmd.args[0])
+		return fmt.Errorf("incorrect amount of arguments in command call: <%v>\nUsage: follow <feed_url>", cmd.name)
 	}
 
 	feed, err := s.db.GetFeedByURL(context.Background(), cmd.args[0])
@@ -252,7 +260,7 @@ func handlerFollowing(s *state, cmd command, user database.User) error {
 
 func handlerUnfollow(s *state, cmd command, user database.User) error {
 	if len(cmd.args) != 1 {
-		return fmt.Errorf("incorrect amount of arguments in command call: <%v> <%v>\nUsage: unfollow <feed_url>", cmd.name, cmd.args[0])
+		return fmt.Errorf("incorrect amount of arguments in command call: <%v>\nUsage: unfollow <feed_url>", cmd.name)
 	}
 
 	err := s.db.DeleteFeedFollowByUrl(context.Background(), database.DeleteFeedFollowByUrlParams{
