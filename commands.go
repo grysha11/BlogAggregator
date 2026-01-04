@@ -84,8 +84,8 @@ func handlerRegister(s *state, cmd command) error {
 
 	user, err := s.db.CreateUser(context.Background(), database.CreateUserParams{
 		ID: uuid.New(),
-		CreatedAt: time.Now(),
-		UpdatedAt: time.Now(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 		Name: cmd.args[0],
 	})
 	if err != nil {
@@ -105,6 +105,7 @@ func handlerReset(s *state, cmd command) error {
 
 	err := s.db.DeleteUsers(context.Background())
 	err = s.db.DeleteFeeds(context.Background())
+	err = s.db.DeleteFeedFollows(context.Background())
 
 	return err
 }
@@ -144,6 +145,8 @@ func handlerAgg(s *state, cmd command) error {
 	return nil
 }
 
+//TODO add checker for dups of feeds
+
 func handlerAddFeed(s *state, cmd command) error {
 	if len(cmd.args) != 2 {
 		return fmt.Errorf("incorrect amount of arguments in command call: <%v> <%v,%v>\nUsage: addfeed <feed_name> <feed_url>", cmd.name, cmd.args[0], cmd.args[1])
@@ -154,7 +157,18 @@ func handlerAddFeed(s *state, cmd command) error {
 		return err
 	}
 
+	checkDup, err := s.db.GetFeedByURL(context.Background(), cmd.args[1])
+	if err == nil && checkDup.ID != uuid.Nil {
+		return fmt.Errorf("feed already exists, exiting now...")
+	}
+	if err != nil && err != sql.ErrNoRows {
+		return err
+	}
+
 	feed, err := s.db.CreateFeed(context.Background(), database.CreateFeedParams{
+		ID:	uuid.New(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
 		Name: cmd.args[0],
 		Url: cmd.args[1],
 		UserID: user.ID,
@@ -163,7 +177,15 @@ func handlerAddFeed(s *state, cmd command) error {
 		return err
 	}
 
-	fmt.Printf("Feed was created: %+v\n", feed)
+	follow, err := s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{
+		ID: uuid.New(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+		UserID: user.ID,
+		FeedID: feed.ID,
+	})
+
+	fmt.Printf("Feed was created: %+v\n", follow)
 	return nil
 }
 
@@ -184,6 +206,60 @@ func handlerFeeds(s *state, cmd command) error {
 			return err
 		}
 		fmt.Printf("*\t%v\n\t %v\n\t %v\n", feed.Name, feed.Url, user.Name)
+	}
+
+	return nil
+}
+
+func handlerFollow(s *state, cmd command) error {
+	if len(cmd.args) != 1 {
+		return fmt.Errorf("incorrect amount of arguments in command call: <%v> <%v>\nUsage: follow <feed_url>", cmd.name, cmd.args[0])
+	}
+
+	feed, err := s.db.GetFeedByURL(context.Background(), cmd.args[0])
+	if err != nil {
+		return fmt.Errorf("Feed doesn't exist: %v", err)
+	}
+
+	user, err := s.db.GetUserByName(context.Background(), s.config.CurrentUsername)
+	if err != nil {
+		return err
+	}
+
+	follow, err := s.db.CreateFeedFollow(context.Background(), database.CreateFeedFollowParams{
+		ID: uuid.New(),
+		CreatedAt: time.Now().UTC(),
+		UpdatedAt: time.Now().UTC(),
+		UserID: user.ID,
+		FeedID: feed.ID,
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Feed:\t%v\nUser:\t%v\n", follow.FeedName, follow.UserName)
+	return nil
+}
+
+func handlerFollowing(s *state, cmd command) error {
+	user, err := s.db.GetUserByName(context.Background(), s.config.CurrentUsername)
+	if err != nil {
+		return err
+	}
+
+	feeds, err := s.db.GetFeedFollowsForUser(context.Background(), user.ID)
+	if err != nil {
+		return err
+	}
+
+	if len(feeds) == 0 {
+		fmt.Printf("You don't have any feeds yet!\n")
+		return nil
+	}
+
+	fmt.Printf("Feeds which %v follows:\n", user.Name)
+	for _, feed := range feeds {
+		fmt.Printf("\t* %v\n", feed.FeedName)
 	}
 
 	return nil
