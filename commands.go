@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"grysha11/BlogAggregator/internal/config"
 	"grysha11/BlogAggregator/internal/database"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -272,5 +273,40 @@ func handlerUnfollow(s *state, cmd command, user database.User) error {
 	}
 
 	fmt.Printf("Feed was unfollowed: %v\n", cmd.args[0])
+	return nil
+}
+
+func handlerBrowse(s *state, cmd command, user database.User) error {
+	var limit int32
+	limit = 2
+
+	if len(cmd.args) > 1 {
+		return fmt.Errorf("incorrect amount of arguments in command call: <%v>\nUsage: browse *Optional:<limit>", cmd.name)
+	}
+
+	if len(cmd.args) == 1 {
+		if manualLimit, err := strconv.Atoi(cmd.args[0]); err == nil {
+			limit = int32(manualLimit)
+		} else {
+			return fmt.Errorf("invalid limit provided: %v", cmd.args[0])
+		}
+	}
+
+	posts, err := s.db.GetPostsForUser(context.Background(), database.GetPostsForUserParams{
+		UserID: user.ID,
+		Limit: limit,
+	})
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Found %v posts for user %v:\n", len(posts), user.Name)
+	for _, post := range posts {
+		fmt.Printf("--- %s ---\n", post.Title)
+		fmt.Printf("    %v\n", post.Description.String)
+		fmt.Printf("    Link: %s\n", post.Url)
+		fmt.Println("=====================================")
+	}
+	
 	return nil
 }

@@ -5,7 +5,9 @@ import (
 	"time"
 	"context"
 	"database/sql"
+	"strings"
 	"grysha11/BlogAggregator/internal/database"
+	"github.com/google/uuid"
 )
 
 func scrapeFeeds(s *state) {
@@ -25,10 +27,44 @@ func scrapeFeeds(s *state) {
 		return
 	}
 
-	_, err = fetchFeed(context.Background(), feed.Url)
+	rssFeed, err := fetchFeed(context.Background(), feed.Url)
 	if err != nil {
 		fmt.Printf("Couldn't fetch feed %v: %v", feed.Name, err)
 	}
 
-	fmt.Printf("Fetched succesfully feed %v\n", feed.Name)
+	for _, item := range rssFeed.Channel.Item {
+		pubDate, err := time.Parse(time.RFC1123Z, item.PubDate)
+		if err != nil {
+			pubDate, err = time.Parse(time.RFC1123, item.PubDate)
+			if err != nil {
+				fmt.Printf("Could not parse Date time <%v> of item %v err: %v\n", item.PubDate, item.Title, err)
+				continue
+			}
+		} 
+
+		description := sql.NullString{}
+		if item.Description != "" {
+			description.String = item.Description
+			description.Valid = true
+		}
+
+		_, err = s.db.CreatePost(context.Background(), database.CreatePostParams{
+			ID: uuid.New(),
+			CreatedAt: time.Now().UTC(),
+			UpdatedAt: time.Now().UTC(),
+			Title: item.Title,
+			Url: item.Link,
+			Description: description,
+			PublishedAt: pubDate,
+			FeedID: feed.ID,
+		})
+		if err != nil {
+			if strings.Contains(err.Error(), "duplicate key") {
+				continue
+			}
+			fmt.Printf("Could not create post for db: %v\n", err)
+		}
+	}
+
+	fmt.Printf("Feed %v is collected, %v posts scanned\n", feed.Name, len(rssFeed.Channel.Item))
 }
