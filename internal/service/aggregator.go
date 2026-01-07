@@ -1,4 +1,4 @@
-package main
+package service
 
 import (
 	"fmt"
@@ -7,17 +7,18 @@ import (
 	"database/sql"
 	"strings"
 	"grysha11/BlogAggregator/internal/database"
+	"grysha11/BlogAggregator/internal/rss"
 	"github.com/google/uuid"
 )
 
-func scrapeFeeds(s *state) {
-	feed, err := s.db.GetNextFeedToFetch(context.Background())
+func ScrapeFeeds(s *State) {
+	feed, err := s.DB.GetNextFeedToFetch(context.Background())
 	if err != nil {
 		fmt.Printf("Couldn't get next feed to fetch: %v\n", err)
 		return
 	}
 
-	_, err = s.db.MarkFeedFetched(context.Background(), database.MarkFeedFetchedParams{
+	_, err = s.DB.MarkFeedFetched(context.Background(), database.MarkFeedFetchedParams{
 		LastFetchedAt: sql.NullTime{Time: time.Now(), Valid: true},
 		UpdatedAt: time.Now().UTC(),
 		ID: feed.ID,
@@ -27,7 +28,7 @@ func scrapeFeeds(s *state) {
 		return
 	}
 
-	rssFeed, err := fetchFeed(context.Background(), feed.Url)
+	rssFeed, err := rss.FetchFeed(context.Background(), feed.Url)
 	if err != nil {
 		fmt.Printf("Couldn't fetch feed %v: %v", feed.Name, err)
 	}
@@ -48,7 +49,7 @@ func scrapeFeeds(s *state) {
 			description.Valid = true
 		}
 
-		_, err = s.db.CreatePost(context.Background(), database.CreatePostParams{
+		_, err = s.DB.CreatePost(context.Background(), database.CreatePostParams{
 			ID: uuid.New(),
 			CreatedAt: time.Now().UTC(),
 			UpdatedAt: time.Now().UTC(),
